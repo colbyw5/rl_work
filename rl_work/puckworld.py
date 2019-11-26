@@ -10,31 +10,27 @@ Created on Fri Nov 15 16:33:40 2019
 import random
 import numpy as np
 from collections import deque
-from math import atan2, sqrt
-import pandas as pd
+#import pandas as pd
 
 # model
 from keras.models import Sequential
 from keras.layers import Dense
 from keras.optimizers import Adam
 
-# custom function for score collection
-#from scores.score_logger import ScoreLogger
+''' DQN for PuckWorld '''
 
-# water world
-
-# importing waterworld environment
+# importing PuckWorld environment
 from ple.games.puckworld import PuckWorld
 from ple import PLE
 
 
 # Model parameters
 
-GAMMA = 0.95
+GAMMA = 0.999
 LEARNING_RATE = 0.001
 
 MEMORY_SIZE = 10000
-BATCH_SIZE = 10
+BATCH_SIZE = 20
 
 EXPLORATION_MAX = 1.0
 EXPLORATION_MIN = 0.01
@@ -45,6 +41,7 @@ EXPLORATION_DECAY = 0.995
 class DQNSolver:
 
     def __init__(self, observation_space, action_space):
+        
         self.exploration_rate = EXPLORATION_MAX
 
         self.action_space = action_space
@@ -80,46 +77,18 @@ class DQNSolver:
         self.exploration_rate = max(EXPLORATION_MIN, self.exploration_rate)
 
     
-# funciton to convert game state to np array
-        
 
-def process_state(state):
-    location_vec = np.array([state['player_x'],
-                          state['player_y'],
-                          state['player_velocity_x'],
-                          state['player_velocity_y']])
-    
-    good_range = sqrt((state['player_x'] - state['good_creep_x'])**2 + (state['player_y'] - state['good_creep_y'])**2)
-    
-    bad_range = sqrt((state['player_x'] - state['bad_creep_x'])**2 + (state['player_y'] - state['bad_creep_y'])**2)
-    
-    
-    range_vec = np.append(good_range, bad_range)
-    
-    good_bearing = atan2((state['player_x'] - state['good_creep_x']), (state['player_y'] - state['good_creep_y']))
-    
-    bad_bearing = atan2((state['player_x'] - state['bad_creep_x']), (state['player_y'] - state['bad_creep_y']))
-    
-    bearing_vec = np.append(good_bearing, bad_bearing)
-    
-    state_vec = np.concatenate([location_vec, range_vec, bearing_vec])
-    
-    return state_vec
     
 
     
     
-def puckworld():
+def puckworld(process_state, display = False):
     
     # Set up WaterWorld Environment
+ 
     game = PuckWorld(width=500, height=500)
-    p = PLE(game, display_screen=True, state_preprocessor=process_state)
     
-    # set up data frame to collect training info
-    
-    columns = ['run', 'step', 'reward', 'epsilon']
-    
-    training_data  = pd.DataFrame(columns = columns)
+    p = PLE(game, display_screen=display, state_preprocessor=process_state)
     
     observation_space = p.state_dim[0]
  
@@ -136,19 +105,16 @@ def puckworld():
         # create new game environment
         p.reset_game()
         p.init()
-        state = p.getGameState()
-        state = np.reshape(state, [1, observation_space])
+        state = np.reshape(p.getGameState(), [1, observation_space])
         step = 0
         
         while True:
             
             step += 1
-            ''' update render to display current run '''
-            #env.render()
-            
+
             agent_action = dqn_solver.act(state)
             
-            action = p.getActionSet()[agent_action]
+            action = p.getActionSet()[dqn_solver.act(state)]
             
             reward = p.act(action)
             
@@ -161,8 +127,6 @@ def puckworld():
             dqn_solver.remember(state, agent_action, reward, state_next, terminal)
             
             state = state_next
-            
-            training_data = training_data.append(run, step, reward, dqn_solver.exploration_rate)
             
             if step > 200:
                 print ("Run: " + str(run) + ", exploration: " + str(dqn_solver.exploration_rate) + ", score: " + str(reward))
