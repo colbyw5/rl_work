@@ -10,7 +10,8 @@ Created on Fri Nov 15 16:33:40 2019
 import random
 import numpy as np
 from collections import deque
-import math
+from math import atan2, sqrt
+import pandas as pd
 
 # model
 from keras.models import Sequential
@@ -32,7 +33,7 @@ from ple import PLE
 GAMMA = 0.95
 LEARNING_RATE = 0.001
 
-MEMORY_SIZE = 1000000
+MEMORY_SIZE = 10000
 BATCH_SIZE = 10
 
 EXPLORATION_MAX = 1.0
@@ -88,14 +89,16 @@ def process_state(state):
                           state['player_velocity_x'],
                           state['player_velocity_y']])
     
-    good_range = math.sqrt((state['player_x'] - state['good_creep_x'])**2 + (state['player_y'] - state['good_creep_y'])**2)
-    bad_range = math.sqrt((state['player_x'] - state['bad_creep_x'])**2 + (state['player_y'] - state['bad_creep_y'])**2)
+    good_range = sqrt((state['player_x'] - state['good_creep_x'])**2 + (state['player_y'] - state['good_creep_y'])**2)
+    
+    bad_range = sqrt((state['player_x'] - state['bad_creep_x'])**2 + (state['player_y'] - state['bad_creep_y'])**2)
     
     
     range_vec = np.append(good_range, bad_range)
     
-    good_bearing = math.atan2((state['player_x'] - state['good_creep_x']), (state['player_y'] - state['good_creep_y']))
-    bad_bearing = math.atan2((state['player_x'] - state['bad_creep_x']), (state['player_y'] - state['bad_creep_y']))
+    good_bearing = atan2((state['player_x'] - state['good_creep_x']), (state['player_y'] - state['good_creep_y']))
+    
+    bad_bearing = atan2((state['player_x'] - state['bad_creep_x']), (state['player_y'] - state['bad_creep_y']))
     
     bearing_vec = np.append(good_bearing, bad_bearing)
     
@@ -112,8 +115,11 @@ def puckworld():
     game = PuckWorld(width=500, height=500)
     p = PLE(game, display_screen=True, state_preprocessor=process_state)
     
-    ''' update score logger for PuckWorld '''
-    #score_logger = ScoreLogger(ENV_NAME)
+    # set up data frame to collect training info
+    
+    columns = ['run', 'step', 'reward', 'epsilon']
+    
+    training_data  = pd.DataFrame(columns = columns)
     
     observation_space = p.state_dim[0]
  
@@ -156,13 +162,12 @@ def puckworld():
             
             state = state_next
             
-            print(reward)
-            print(step)
+            training_data = training_data.append(run, step, reward, dqn_solver.exploration_rate)
             
             if step > 200:
                 print ("Run: " + str(run) + ", exploration: " + str(dqn_solver.exploration_rate) + ", score: " + str(reward))
                 ''' update score logger for waterworld '''
-                #ScoreLogger.add_score(step, run)
+                # save run, step, reward, exploration, 
                 break
             dqn_solver.experience_replay()
 
