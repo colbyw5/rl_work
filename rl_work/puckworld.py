@@ -10,7 +10,8 @@ Created on Fri Nov 15 16:33:40 2019
 import random
 import numpy as np
 from collections import deque
-#import pandas as pd
+import pandas as pd
+import pickle
 
 # model
 from keras.models import Sequential
@@ -26,15 +27,15 @@ from ple import PLE
 
 # Model parameters
 
-GAMMA = 0.999
+GAMMA = 0.95
 LEARNING_RATE = 0.001
 
-MEMORY_SIZE = 10000
+MEMORY_SIZE = 100000
 BATCH_SIZE = 20
 
-EXPLORATION_MAX = 1.0
+EXPLORATION_MAX = 0.15
 EXPLORATION_MIN = 0.01
-EXPLORATION_DECAY = 0.995
+EXPLORATION_DECAY = 0.99
 
 # creat DQN solver for function approximation
 
@@ -49,6 +50,7 @@ class DQNSolver:
 
         self.model = Sequential()
         self.model.add(Dense(24, input_shape=(observation_space,), activation="relu"))
+        self.model.add(Dense(24, activation="relu"))
         self.model.add(Dense(24, activation="relu"))
         self.model.add(Dense(self.action_space, activation="linear"))
         self.model.compile(loss="mse", optimizer=Adam(lr=LEARNING_RATE))
@@ -82,7 +84,7 @@ class DQNSolver:
 
     
     
-def puckworld(process_state, display = False):
+def puckworld(process_state, solved_score, solved_runs, display = False, max_runs = 1000):
     
     # Set up WaterWorld Environment
  
@@ -97,8 +99,16 @@ def puckworld(process_state, display = False):
     dqn_solver = DQNSolver(observation_space, action_space)
     
     run = 0
+        
+    run_results = []
+    exploration_rates = []
+    runs = []
+        
+    solved = False
     
-    while True:
+    history = deque(np.repeat(-np.inf, solved_runs), maxlen = solved_runs)
+
+    while not solved:
         
         run += 1
         
@@ -108,7 +118,12 @@ def puckworld(process_state, display = False):
         state = np.reshape(p.getGameState(), [1, observation_space])
         step = 0
         
-        while True:
+        # set up run results collection
+        
+        run_proceed = True
+        run_rewards = []
+        
+        while run_proceed:
             
             step += 1
 
@@ -117,6 +132,8 @@ def puckworld(process_state, display = False):
             action = p.getActionSet()[dqn_solver.act(state)]
             
             reward = p.act(action)
+            
+            run_rewards.append(reward)
             
             state_next = p.getGameState()
             
@@ -128,12 +145,53 @@ def puckworld(process_state, display = False):
             
             state = state_next
             
-            if step > 200:
-                print ("Run: " + str(run) + ", exploration: " + str(dqn_solver.exploration_rate) + ", score: " + str(reward))
-                ''' update score logger for waterworld '''
+            #current rule for run: at least 250 steps
+            
+            if step > 250:
+                
+                print ("Run: " + str(run) + ", exploration: " + str(dqn_solver.exploration_rate) + ", score: " + str(sum(run_rewards)))
+                
                 # save run, step, reward, exploration, 
+                
+                run_results.append(sum(run_rewards))
+                exploration_rates.append(dqn_solver.exploration_rate)
+                runs.append(run)
+                
+                history.append(sum(run_rewards))
+                run_proceed = False
+                
+                # solved: if the past 'solved_runs' runs are all greater than 'solved_score'
+                
+                solved = not any(run < solved_score for run in history)
+                
+                # Update network
+                
+                if np.mod(run, 4) == 0:
+                
+                    dqn_solver.experience_replay()
+
+                # if solved, save results to CSV, save model
+            
+            if solved or run == max_runs:
+                
+                # save results to csv
+                
+                print('SOLVED')
+                
+                pd.DataFrame({'rewards': run_results,
+                              'exploration': exploration_rates,
+                              'run': runs}).to_csv('results.csv', index = False)
+                
+                # save model
+
+                with open('solved.model', 'wb') as solved_model:
+                    pickle.dump(dqn_solver, solved_model)
+                    
+                solved = True
+                    
                 break
-            dqn_solver.experience_replay()
+                
+
 
 
 if __name__ == "__main__":
