@@ -27,15 +27,15 @@ from ple import PLE
 
 # Model parameters
 
-GAMMA = 0.95
-LEARNING_RATE = 0.001
+GAMMA = 0.85
+LEARNING_RATE = 0.01
 
 MEMORY_SIZE = 100000
-BATCH_SIZE = 20
+BATCH_SIZE = 30
 
 EXPLORATION_MAX = 0.15
 EXPLORATION_MIN = 0.01
-EXPLORATION_DECAY = 0.99
+EXPLORATION_DECAY = 0.995
 
 # creat DQN solver for function approximation
 
@@ -44,13 +44,12 @@ class DQNSolver:
     def __init__(self, observation_space, action_space):
         
         self.exploration_rate = EXPLORATION_MAX
-
         self.action_space = action_space
         self.memory = deque(maxlen=MEMORY_SIZE)
-
         self.model = Sequential()
-        self.model.add(Dense(24, input_shape=(observation_space,), activation="relu"))
-        self.model.add(Dense(24, activation="relu"))
+        self.model.add(Dense(24, input_shape=(observation_space,), activation="tanh"))
+        self.model.add(Dense(32, activation="tanh"))
+        self.model.add(Dense(32, activation="tanh"))
         self.model.add(Dense(self.action_space, activation="linear"))
         self.model.compile(loss="mse", optimizer=Adam(lr=LEARNING_RATE))
 
@@ -97,6 +96,8 @@ def puckworld(process_state, solved_score, solved_runs, display = False, max_run
     
     dqn_solver = DQNSolver(observation_space, action_space)
     
+    # setup collection items
+    
     run = 0
         
     run_results = []
@@ -109,8 +110,6 @@ def puckworld(process_state, solved_score, solved_runs, display = False, max_run
 
     while not solved:
         
-        run += 1
-        
         # create new game environment
         p.reset_game()
         p.init()
@@ -120,11 +119,15 @@ def puckworld(process_state, solved_score, solved_runs, display = False, max_run
         # set up run results collection
         
         run_proceed = True
+        
         run_rewards = []
         
         while run_proceed:
             
+            
             step += 1
+            
+            # updating game
 
             agent_action = dqn_solver.act(state)
             
@@ -136,7 +139,7 @@ def puckworld(process_state, solved_score, solved_runs, display = False, max_run
             
             state_next = p.getGameState()
             
-            terminal = p.game_over()
+            terminal = step % 500 == 0
             
             state_next = np.reshape(state_next, [1, observation_space])
             
@@ -144,30 +147,35 @@ def puckworld(process_state, solved_score, solved_runs, display = False, max_run
             
             state = state_next
             
-            #current rule for run: at least 250 steps
+            #current rule for run: 500 steps (green puck location updates)
             
-            if step > 250:
+            if step % 500 == 0:
                 
                 print ("Run: " + str(run) + ", exploration: " + str(dqn_solver.exploration_rate) + ", score: " + str(sum(run_rewards)))
                 
                 # save run, step, reward, exploration, 
                 
+                run += 1
+                
                 run_results.append(sum(run_rewards))
+                
                 exploration_rates.append(dqn_solver.exploration_rate)
+                
                 runs.append(run)
                 
                 history.append(sum(run_rewards))
-                run_proceed = False
                 
                 # solved: if the past 'solved_runs' runs are all greater than 'solved_score'
                 
                 solved = not any(run < solved_score for run in history)
                 
-                # Update network
+                run_rewards = []
                 
-                if np.mod(run, 4) == 0:
+            # Update network every 50 steps
                 
-                    dqn_solver.experience_replay()
+            if np.mod(step, 50) == 0:
+                
+                dqn_solver.experience_replay()
 
                 # if solved, save results to CSV, save model
             
@@ -176,6 +184,8 @@ def puckworld(process_state, solved_score, solved_runs, display = False, max_run
                 # save results to csv
                 
                 print('SOLVED')
+                
+                run_proceed = False
                 
                 pd.DataFrame({'rewards': run_results,
                               'exploration': exploration_rates,
