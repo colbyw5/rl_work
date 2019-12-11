@@ -22,20 +22,19 @@ from keras.optimizers import Adam
 
 # importing PuckWorld environment
 from ple.games.puckworld import PuckWorld
-from ple import PLE
-
+from ple import PLE 
 
 # Model parameters
 
-GAMMA = 0.85
+GAMMA = 0.95
 LEARNING_RATE = 0.01
 
-MEMORY_SIZE = 100000
-BATCH_SIZE = 30
+MEMORY_SIZE = 10000
+BATCH_SIZE = 50
 
-EXPLORATION_MAX = 0.15
+EXPLORATION_MAX = 0.20
 EXPLORATION_MIN = 0.01
-EXPLORATION_DECAY = 0.995
+EXPLORATION_DECAY = 0.99995
 
 # creat DQN solver for function approximation
 
@@ -47,9 +46,8 @@ class DQNSolver:
         self.action_space = action_space
         self.memory = deque(maxlen=MEMORY_SIZE)
         self.model = Sequential()
-        self.model.add(Dense(24, input_shape=(observation_space,), activation="tanh"))
-        self.model.add(Dense(32, activation="tanh"))
-        self.model.add(Dense(32, activation="tanh"))
+        self.model.add(Dense(4, input_shape=(observation_space,), activation="tanh"))
+        self.model.add(Dense(4, activation="tanh"))
         self.model.add(Dense(self.action_space, activation="linear"))
         self.model.compile(loss="mse", optimizer=Adam(lr=LEARNING_RATE))
 
@@ -171,11 +169,11 @@ def puckworld(process_state, solved_score, solved_runs, display = False, max_run
                 
                 run_rewards = []
                 
-            # Update network every 50 steps
+            # Update network every 10 steps
                 
-            if np.mod(step, 50) == 0:
+            # if np.mod(step, 10) == 0:
                 
-                dqn_solver.experience_replay()
+            dqn_solver.experience_replay()
 
                 # if solved, save results to CSV, save model
             
