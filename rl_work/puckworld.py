@@ -47,7 +47,7 @@ class DQNSolver:
         self.memory = deque(maxlen=MEMORY_SIZE)
         self.model = Sequential()
         self.model.add(Dense(4, input_shape=(observation_space,), activation="tanh"))
-        self.model.add(Dense(4, activation="tanh"))
+        self.model.add(Dense(6, activation="tanh"))
         self.model.add(Dense(self.action_space, activation="linear"))
         self.model.compile(loss="mse", optimizer=Adam(lr=LEARNING_RATE))
 
