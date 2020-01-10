@@ -30,7 +30,7 @@ GAMMA = 0.95
 LEARNING_RATE = 0.01
 
 MEMORY_SIZE = 10000
-BATCH_SIZE = 50
+BATCH_SIZE = 100
 
 EXPLORATION_MAX = 0.20
 EXPLORATION_MIN = 0.01
@@ -46,8 +46,8 @@ class DQNSolver:
         self.action_space = action_space
         self.memory = deque(maxlen=MEMORY_SIZE)
         self.model = Sequential()
-        self.model.add(Dense(4, input_shape=(observation_space,), activation="tanh"))
-        self.model.add(Dense(6, activation="tanh"))
+        self.model.add(Dense(4, input_shape=(observation_space,), activation="relu"))
+        self.model.add(Dense(6, activation="relu"))
         self.model.add(Dense(self.action_space, activation="linear"))
         self.model.compile(loss="mse", optimizer=Adam(lr=LEARNING_RATE))
 
@@ -70,7 +70,7 @@ class DQNSolver:
                 q_update = (reward + GAMMA * np.amax(self.model.predict(state_next)[0]))
             q_values = self.model.predict(state)
             q_values[0][action] = q_update
-            self.model.fit(state, q_values, verbose=0)
+            self.model.fit(state, q_values, verbose=0, epochs = 1)
         self.exploration_rate *= EXPLORATION_DECAY
         self.exploration_rate = max(EXPLORATION_MIN, self.exploration_rate)
 
