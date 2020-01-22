@@ -4,3 +4,9 @@ Purpose: evaluate publically available, open-source environments for similaritie
 
 - Python Learning Environment: WaterWorld
   - Algorithm(s): Deep Q-Learning
+  
+### Technologies
+
+- Python 3.7.3
+  - pandas 0.25.3 
+  - numpy 1.17.4
