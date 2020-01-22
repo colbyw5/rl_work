@@ -10,3 +10,8 @@ Purpose: evaluate publically available, open-source environments for similaritie
 - Python 3.7.3
   - pandas 0.25.3 
   - numpy 1.17.4
+  - ple 0.0.1
+  - matplotlib 3.1.1
+  - keras 2.2.4
+    - keras-rl 0.4.2
+  - tensorflow 1.15.0
