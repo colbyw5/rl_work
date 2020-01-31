@@ -45,9 +45,10 @@ class DQNSolver:
         self.exploration_rate = EXPLORATION_MAX
         self.action_space = action_space
         self.memory = deque(maxlen=MEMORY_SIZE)
+        
         self.model = Sequential()
-        self.model.add(Dense(4, input_shape=(observation_space,), activation="relu"))
-        self.model.add(Dense(6, activation="relu"))
+        self.model.add(Dense(6, input_shape=(observation_space,), activation="relu"))
+        self.model.add(Dense(6, activation="tanh"))
         self.model.add(Dense(self.action_space, activation="linear"))
         self.model.compile(loss="mse", optimizer=Adam(lr=LEARNING_RATE))
 
@@ -61,6 +62,7 @@ class DQNSolver:
         return np.argmax(q_values[0])
 
     def experience_replay(self):
+        
         if len(self.memory) < BATCH_SIZE:
             return
         batch = random.sample(self.memory, BATCH_SIZE)
@@ -97,7 +99,6 @@ def puckworld(process_state, solved_score, solved_runs, display = False, max_run
     # setup collection items
     
     run = 0
-        
     run_results = []
     exploration_rates = []
     runs = []
@@ -123,31 +124,41 @@ def puckworld(process_state, solved_score, solved_runs, display = False, max_run
         while run_proceed:
             
             
-            step += 1
-            
-            # updating game
+            # getting action: getting Q-value from agent, translate into action
 
             agent_action = dqn_solver.act(state)
             
             action = p.getActionSet()[dqn_solver.act(state)]
             
+            # agent acts, reward is realized
+            
             reward = p.act(action)
             
             run_rewards.append(reward)
             
+            # getting next state based on action
+            
             state_next = p.getGameState()
             
-            terminal = step % 500 == 0
+            # terminating current run at 500 steps
+            
+            terminal = step == 500
+            
+            # reshaping new state for memory, adding s, a, r, s', terminal to memory
             
             state_next = np.reshape(state_next, [1, observation_space])
             
             dqn_solver.remember(state, agent_action, reward, state_next, terminal)
             
+            # updating current state
+            
             state = state_next
+            
+            step += 1
             
             #current rule for run: 500 steps (green puck location updates)
             
-            if step % 500 == 0:
+            if step == 500:
                 
                 print ("Run: " + str(run) + ", exploration: " + str(dqn_solver.exploration_rate) + ", score: " + str(sum(run_rewards)))
                 
