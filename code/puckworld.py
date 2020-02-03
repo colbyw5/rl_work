@@ -18,7 +18,7 @@ from keras.models import Sequential
 from keras.layers import Dense
 from keras.optimizers import Adam
 
-''' DQN for PuckWorld '''
+''' DDQN for PuckWorld '''
 
 # importing PuckWorld environment
 from ple.games.puckworld import PuckWorld
