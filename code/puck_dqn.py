@@ -26,8 +26,8 @@ from ple import PLE
 class DQN_agent:
     
     def __init__(self, state_space, action_space, memory_max = 10000,
-                 discount = 0.95, epsilon = 0.5, epsilon_min = 0.01,
-                 learning_rate = 0.001, epsilon_decay = 0.9995):
+                 discount = 0.9, epsilon = 0.5, epsilon_min = 0.01,
+                 learning_rate = 0.01, epsilon_decay = 0.9995):
         
         self.state_space = state_space
         self.action_space = action_space
@@ -44,9 +44,9 @@ class DQN_agent:
         ''' neural network for Q-value function '''
         
         q_network = Sequential()
-        q_network.add(Dense(6, input_dim = self.state_space,
+        q_network.add(Dense(100, input_dim = self.state_space,
                             activation = 'tanh'))
-        q_network.add(Dense(6, activation = 'tanh'))
+        #q_network.add(Dense(100, activation = 'tanh'))
         q_network.add(Dense(self.action_space, activation = 'linear'))
         q_network.compile(loss = 'mse',
                           optimizer = Adam(lr = self.learning_rate))
@@ -68,7 +68,7 @@ class DQN_agent:
         action_q = self.q_network.predict(state)
         return np.argmax(action_q[0])
     
-    def replay(self, batch_size = 256, epochs = 1):
+    def replay(self, batch_size = 25, epochs = 1):
         
         
         batch = random.sample(self.memory, batch_size)
@@ -119,9 +119,9 @@ def puckworld(process_state, display = False, max_iterations = 1000):
  
     action_space = len(p.getActionSet())
     
-    agent = DQN_agent(state_space, action_space, memory_max = 10000,
-                 discount = 0.95, epsilon = 1.0, epsilon_min = 0.01,
-                 learning_rate = 0.001)
+    agent = DQN_agent(state_space, action_space, memory_max = 5000,
+                 discount = 0.9, epsilon = 0.2, epsilon_min = 0.01,
+                 learning_rate = 0.01,  epsilon_decay = 0.9995)
     
     # setup collection items
     
@@ -131,13 +131,14 @@ def puckworld(process_state, display = False, max_iterations = 1000):
     iterations = []
     
     history = deque(np.repeat(-np.inf, max_iterations), maxlen = max_iterations)
+    
+    # create new game environment
+    
+    p.reset_game()
+        
+    p.init()
 
     while iteration <= max_iterations:
-        
-        # create new game environment
-        p.reset_game()
-        
-        p.init()
         
         state = np.reshape(p.getGameState(), [1, state_space])
         
@@ -201,25 +202,27 @@ def puckworld(process_state, display = False, max_iterations = 1000):
                 
             # Update network each step when memory length > batch size
             
-            if len(agent.memory) > 1000:
+            if (len(agent.memory) > 1000) & (step % 25 == 0):
                 
                 agent.replay()
 
-                # if solved, save results to CSV, save model
+                # max iterations reached: save results to CSV, save model
             
-            if iteration == max_iterations:
-                
-                # save results to csv
-                
-                print('End Training')
-                
-                pd.DataFrame({'rewards': iteration_results,
-                              'exploration': exploration_rates,
-                              'run': iterations}).to_csv('./results.csv', index = False)
-                
-                # save model
-                
-                agent.save_agent(path = './')
+        if iteration == max_iterations:
+            
+            # save results to csv
+            
+            print('End Training')
+            
+            pd.DataFrame({'rewards': iteration_results,
+                          'exploration': exploration_rates,
+                          'run': iterations}).to_csv('./results.csv', index = False)
+            
+            # save model
+            
+            agent.save_agent(path = '../models/model.h5')
+            
+            break
         
         
         
