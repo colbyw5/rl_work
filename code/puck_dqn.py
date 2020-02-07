@@ -44,8 +44,9 @@ class DQN_agent:
         ''' neural network for Q-value function '''
         
         q_network = Sequential()
-        q_network.add(Dense(20, input_dim = self.state_space,
-                            activation = 'tanh'))
+        q_network.add(Dense(40, input_dim = self.state_space,
+                            activation = 'relu'))
+        q_network.add(Dense(40, activation = 'relu'))
         q_network.add(Dense(self.action_space, activation = 'linear'))
         q_network.compile(loss = 'mse',
                           optimizer = Adam(lr = self.learning_rate))
@@ -62,13 +63,18 @@ class DQN_agent:
         ''' select action using epsilon-greedy method '''
         
         if np.random.rand() < self.epsilon:
-            return random.sample(actions, 1)[0]
+            
+            action = random.sample(actions, 1)[0]
+            
+        else:
+            
+            action_q = self.q_network.predict(state)
         
-        action_q = self.q_network.predict(state)
-        return np.argmax(action_q[0])
+            action = actions[np.argmax(action_q[0])]
+        
+        return action
     
     def replay(self, batch_size = 256, epochs = 1):
-        
         
         batch = random.sample(self.memory, batch_size)
         
@@ -83,7 +89,7 @@ class DQN_agent:
                 
             target_f = self.q_network.predict(state)
             
-            target_f[0] = target
+            target_f[0][action] = target
             
             self.q_network.fit(state, target_f, epochs = epochs, verbose = 0)
                 
@@ -103,10 +109,8 @@ class DQN_agent:
         
         
         
-        
-        
 
-def puckworld(process_state, display = False, max_iterations = 1000):
+def puckworld_dqn(process_state, display = False, max_iterations = 1000):
     
     # Set up WaterWorld Environment
  
@@ -150,7 +154,6 @@ def puckworld(process_state, display = False, max_iterations = 1000):
             
             # getting action: getting Q-value from agent, translate into action
 
-            
             action = agent.act(state, actions = p.getActionSet())
             
             # agent acts, reward is realized
@@ -171,7 +174,9 @@ def puckworld(process_state, display = False, max_iterations = 1000):
             
             state_next = np.reshape(state_next, [1, state_space])
             
-            agent.memorize(state, action, reward, state_next, done)
+            agent_action = p.getActionSet().index(action)
+            
+            agent.memorize(state, agent_action, reward, state_next, done)
             
             # updating current state
             
@@ -203,7 +208,8 @@ def puckworld(process_state, display = False, max_iterations = 1000):
                 
                 agent.replay()
 
-                # max iterations reached: save results to CSV, save model
+        
+        # max iterations reached: save results to CSV, save model    
             
         if iteration == max_iterations:
             
@@ -223,7 +229,6 @@ def puckworld(process_state, display = False, max_iterations = 1000):
         
         iteration += 1
         
-  
-
         
-        
+ 
+    
