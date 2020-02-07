@@ -44,9 +44,8 @@ class DQN_agent:
         ''' neural network for Q-value function '''
         
         q_network = Sequential()
-        q_network.add(Dense(100, input_dim = self.state_space,
+        q_network.add(Dense(20, input_dim = self.state_space,
                             activation = 'tanh'))
-        #q_network.add(Dense(100, activation = 'tanh'))
         q_network.add(Dense(self.action_space, activation = 'linear'))
         q_network.compile(loss = 'mse',
                           optimizer = Adam(lr = self.learning_rate))
@@ -68,7 +67,7 @@ class DQN_agent:
         action_q = self.q_network.predict(state)
         return np.argmax(action_q[0])
     
-    def replay(self, batch_size = 25, epochs = 1):
+    def replay(self, batch_size = 256, epochs = 1):
         
         
         batch = random.sample(self.memory, batch_size)
@@ -82,11 +81,11 @@ class DQN_agent:
                 target = (reward + self.gamma * 
                           np.amax(self.q_network.predict(next_state)[0]))
                 
-                target_f = self.q_network.predict(state)
-                
-                target_f[0] = target
-                
-                self.q_network.fit(state, target_f, epochs = epochs, verbose = 0)
+            target_f = self.q_network.predict(state)
+            
+            target_f[0] = target
+            
+            self.q_network.fit(state, target_f, epochs = epochs, verbose = 0)
                 
         if self.epsilon > self.epsilon_min:
             
@@ -188,15 +187,13 @@ def puckworld(process_state, display = False, max_iterations = 1000):
                 
                 # save run, step, reward, exploration, 
                 
-                iteration += 1
-                
-                iteration_results.append(np.mean(iteration_rewards))
+                iteration_results.append(np.sum(iteration_rewards))
                 
                 exploration_rates.append(agent.epsilon)
                 
                 iterations.append(iteration)
                 
-                history.append(np.mean(iteration_rewards))
+                history.append(np.sum(iteration_rewards))
                 
                 iteration_rewards = []
                 
@@ -224,9 +221,9 @@ def puckworld(process_state, display = False, max_iterations = 1000):
             
             break
         
+        iteration += 1
         
-        
-        
+  
 
         
         
