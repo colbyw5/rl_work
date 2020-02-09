@@ -16,6 +16,8 @@ import pandas as pd
 from keras.models import Sequential
 from keras.layers import Dense
 from keras.optimizers import Adam
+from keras import backend as K
+import tensorflow as tf
 
 # importing PuckWorld environment
 from ple.games.puckworld import PuckWorld
@@ -26,7 +28,7 @@ from ple import PLE
 class DQN_agent:
     
     def __init__(self, state_space, action_space, memory_max = 10000,
-                 discount = 0.9, epsilon = 0.5, epsilon_min = 0.01,
+                 discount = 0.95, epsilon = 0.5, epsilon_min = 0.01,
                  learning_rate = 0.01, epsilon_decay = 0.9995):
         
         self.state_space = state_space
@@ -39,16 +41,25 @@ class DQN_agent:
         self.learning_rate = learning_rate
         self.q_network = self._build_model()
         
+    def _huber_loss(self, y_true, y_pred, clip_delta=1.0):
+        
+        error = y_true - y_pred
+        cond  = K.abs(error) <= clip_delta
+
+        squared_loss = 0.5 * K.square(error)
+        quadratic_loss = 0.5 * K.square(clip_delta) + clip_delta * (K.abs(error) - clip_delta)
+
+        return K.mean(tf.where(cond, squared_loss, quadratic_loss))
+        
     def _build_model(self):
         
         ''' neural network for Q-value function '''
         
         q_network = Sequential()
         q_network.add(Dense(40, input_dim = self.state_space,
-                            activation = 'relu'))
-        q_network.add(Dense(40, activation = 'relu'))
+                            activation = 'tanh'))
         q_network.add(Dense(self.action_space, activation = 'linear'))
-        q_network.compile(loss = 'mse',
+        q_network.compile(loss = self._huber_loss,
                           optimizer = Adam(lr = self.learning_rate))
         return q_network
         
@@ -114,7 +125,7 @@ def puckworld_dqn(process_state, display = False, max_iterations = 1000):
     
     # Set up WaterWorld Environment
  
-    game = PuckWorld(width=500, height=500)
+    game = PuckWorld(width=100, height=100)
     
     p = PLE(game, display_screen=display, state_preprocessor = process_state)
     
@@ -122,7 +133,7 @@ def puckworld_dqn(process_state, display = False, max_iterations = 1000):
  
     action_space = len(p.getActionSet())
     
-    agent = DQN_agent(state_space, action_space, memory_max = 5000,
+    agent = DQN_agent(state_space, action_space, memory_max = 1000,
                  discount = 0.9, epsilon = 0.2, epsilon_min = 0.01,
                  learning_rate = 0.01,  epsilon_decay = 0.9995)
     
@@ -204,7 +215,7 @@ def puckworld_dqn(process_state, display = False, max_iterations = 1000):
                 
             # Update network each step when memory length > batch size
             
-            if (len(agent.memory) > 1000) & (step % 25 == 0):
+            if (len(agent.memory) > 500) & (step % 50 == 0):
                 
                 agent.replay()
 

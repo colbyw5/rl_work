@@ -16,12 +16,16 @@ import pandas as pd
 from keras.models import Sequential
 from keras.layers import Dense
 from keras.optimizers import Adam
+from keras import backend as K
+import tensorflow as tf
 
 # importing PuckWorld environment
 from ple.games.puckworld import PuckWorld
 from ple import PLE 
 
-''' Deep Q-learning for PuckWorld '''
+''' Double Deep Q-learning for PuckWorld '''
+
+
 
 class DDQN_agent:
     
@@ -41,15 +45,27 @@ class DDQN_agent:
         self.target_network = self.build_model()
         self.update_target()
         
+    
+    def _huber_loss(self, y_true, y_pred, clip_delta=1.0):
+        
+        error = y_true - y_pred
+        cond  = K.abs(error) <= clip_delta
+
+        squared_loss = 0.5 * K.square(error)
+        quadratic_loss = 0.5 * K.square(clip_delta) + clip_delta * (K.abs(error) - clip_delta)
+
+        return K.mean(tf.where(cond, squared_loss, quadratic_loss))
+    
+        
     def _build_model(self):
         
         ''' neural network for Q-value function '''
         
         q_network = Sequential()
-        q_network.add(Dense(80, input_dim = self.state_space,
-                            activation = 'relu'))
+        q_network.add(Dense(20, input_dim = self.state_space,
+                            activation = 'tanh'))
         q_network.add(Dense(self.action_space, activation = 'linear'))
-        q_network.compile(loss = 'mse',
+        q_network.compile(loss = self._huber_loss,
                           optimizer = Adam(lr = self.learning_rate))
         return q_network
     
@@ -71,13 +87,17 @@ class DDQN_agent:
         
         if np.random.rand() < self.epsilon:
             
-            print('random choice')
-            return random.sample(actions, 1)[0]
+            action = random.sample(actions, 1)[0]
+            
+        else:
+            
+            action_q = self.q_network.predict(state)
         
-        action_q = self.q_network.predict(state)
-        return np.argmax(action_q[0])
+            action = actions[np.argmax(action_q[0])]
+        
+        return action
     
-    def replay(self, batch_size = 256, epochs = 1):
+    def replay(self, batch_size = 128, epochs = 1):
         
         batch = random.sample(self.memory, batch_size)
         
@@ -90,9 +110,9 @@ class DDQN_agent:
                 target = (reward + self.gamma * 
                           np.amax(self.target_network.predict(next_state)[0]))
                 
-            target_f = self.q_network.predict(state)
+            target_f = self.target_network.predict(state)
             
-            target_f[0] = target
+            target_f[0][action] = target
             
             self.q_network.fit(state, target_f, epochs = epochs, verbose = 0)
                 
@@ -112,14 +132,12 @@ class DDQN_agent:
         
         
         
-        
-        
 
 def puckworld_ddqn(process_state, display = False, max_iterations = 1000):
     
     # Set up WaterWorld Environment
  
-    game = PuckWorld(width=500, height=500)
+    game = PuckWorld(width=100, height=100)
     
     p = PLE(game, display_screen=display, state_preprocessor = process_state)
     
@@ -127,7 +145,7 @@ def puckworld_ddqn(process_state, display = False, max_iterations = 1000):
  
     action_space = len(p.getActionSet())
     
-    agent = DDQN_agent(state_space, action_space, memory_max = 5000,
+    agent = DDQN_agent(state_space, action_space, memory_max = 1000,
                  discount = 0.9, epsilon = 0.2, epsilon_min = 0.01,
                  learning_rate = 0.01,  epsilon_decay = 0.9995)
     
@@ -159,7 +177,6 @@ def puckworld_ddqn(process_state, display = False, max_iterations = 1000):
             
             # getting action: getting Q-value from agent, translate into action
 
-            
             action = agent.act(state, actions = p.getActionSet())
             
             # agent acts, reward is realized
@@ -180,7 +197,9 @@ def puckworld_ddqn(process_state, display = False, max_iterations = 1000):
             
             state_next = np.reshape(state_next, [1, state_space])
             
-            agent.memorize(state, action, reward, state_next, done)
+            agent_action = p.getActionSet().index(action)
+            
+            agent.memorize(state, agent_action, reward, state_next, done)
             
             # updating current state
             
@@ -208,17 +227,16 @@ def puckworld_ddqn(process_state, display = False, max_iterations = 1000):
                 
             # Update network each step when memory length > batch size
             
-            if (len(agent.memory) > 1000) & (step % 25 == 0):
+            if (len(agent.memory) > 500) & (step % 50 == 0):
                 
                 agent.replay()
-
-                # max iterations reached: save results to CSV, save model
                 
-        if iteration % 2 == 0:
-            
-            # every two iterations: update target model with existing model
-            agent.update_target()
-            
+            if iteration % 2 == 0:
+                
+                agent.update_target()
+
+        
+        # max iterations reached: save results to CSV, save model    
             
         if iteration == max_iterations:
             
@@ -237,8 +255,6 @@ def puckworld_ddqn(process_state, display = False, max_iterations = 1000):
             break
         
         iteration += 1
-        
   
-
         
         
