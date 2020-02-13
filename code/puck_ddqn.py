@@ -62,11 +62,11 @@ class DDQN_agent:
         ''' neural network for Q-value function '''
         
         q_network = Sequential()
-        q_network.add(Dense(40, input_dim = self.state_space,
+        q_network.add(Dense(50, input_dim = self.state_space,
                             activation = 'tanh'))
         q_network.add(Dense(self.action_space, activation = 'linear'))
-        q_network.compile(loss = self._huber_loss,
-                          optimizer = Adam(lr = self.learning_rate))
+        q_network.compile(optimizer='rmsprop',
+                          loss='mse')
         return q_network
     
     def update_target(self):
@@ -97,7 +97,7 @@ class DDQN_agent:
         
         return action
     
-    def replay(self, batch_size = 64, epochs = 1):
+    def replay(self, batch_size = 16, epochs = 1):
         
         batch = random.sample(self.memory, batch_size)
         
@@ -137,7 +137,7 @@ def puckworld_ddqn(process_state, display = False, max_iterations = 1000):
     
     # Set up WaterWorld Environment
  
-    game = PuckWorld(width=100, height=100)
+    game = PuckWorld(width=20, height=20)
     
     p = PLE(game, display_screen=display, state_preprocessor = process_state)
     
@@ -145,13 +145,13 @@ def puckworld_ddqn(process_state, display = False, max_iterations = 1000):
  
     action_space = len(p.getActionSet())
     
-    agent = DDQN_agent(state_space, action_space, memory_max = 2000,
-                 discount = 0.95, epsilon = 0.35, epsilon_min = 0.01,
-                 learning_rate = 0.001,  epsilon_decay = 0.9995)
+    agent = DDQN_agent(state_space, action_space, memory_max = 20000,
+                 discount = 0.95, epsilon = 0.40, epsilon_min = 0.01,
+                 learning_rate = 0.005,  epsilon_decay = 0.995)
     
     # setup collection items
     
-    iteration = 0
+    iteration = 1
     iteration_results = []
     exploration_rates = []
     iterations = []
@@ -168,7 +168,7 @@ def puckworld_ddqn(process_state, display = False, max_iterations = 1000):
         
         state = np.reshape(p.getGameState(), [1, state_space])
         
-        step = 0
+        step = 1
         
         iteration_rewards = []
         
@@ -178,6 +178,7 @@ def puckworld_ddqn(process_state, display = False, max_iterations = 1000):
             # getting action: getting Q-value from agent, translate into action
 
             action = agent.act(state, actions = p.getActionSet())
+                
             
             # agent acts, reward is realized
             
@@ -211,29 +212,29 @@ def puckworld_ddqn(process_state, display = False, max_iterations = 1000):
             
             if step == 500:
                 
-                print ("Run: " + str(iteration) + ", exploration: " + str(round(agent.epsilon, 3)) + ", score: " + str(round(sum(iteration_rewards), 3)))
+                print ("Run: " + str(iteration) + ", exploration: " + str(round(agent.epsilon, 3)) + ", score: " + str(round(np.mean(iteration_rewards), 3)))
                 
                 # save run, step, reward, exploration, 
                 
-                iteration_results.append(np.sum(iteration_rewards))
+                iteration_results.append(np.mean(iteration_rewards))
                 
                 exploration_rates.append(agent.epsilon)
                 
                 iterations.append(iteration)
                 
-                history.append(np.sum(iteration_rewards))
+                history.append(np.mean(iteration_rewards))
                 
                 iteration_rewards = []
                 
             # Update network each step when memory length > batch size
             
-            if (len(agent.memory) > 500) & (step % 50 == 0):
+            if (len(agent.memory) > 10000) & (step % 500 == 0):
                 
                 agent.replay()
                 
-            if iteration % 25 == 0:
-                
-                agent.update_target()
+                if iteration % 20 == 0:
+                    
+                    agent.update_target()
 
         
         # max iterations reached: save results to CSV, save model    
@@ -255,6 +256,6 @@ def puckworld_ddqn(process_state, display = False, max_iterations = 1000):
             break
         
         iteration += 1
-  
+        
         
         
