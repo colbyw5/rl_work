@@ -31,7 +31,7 @@ class DDQN_agent:
     
     def __init__(self, state_space, action_space, memory_max = 10000,
                  discount = 0.9, epsilon = 0.5, epsilon_min = 0.01,
-                 learning_rate = 0.001, epsilon_decay = 0.9995):
+                 learning_rate = 0.001, epsilon_decay = 0.995):
         
         self.state_space = state_space
         self.action_space = action_space
@@ -66,7 +66,7 @@ class DDQN_agent:
                             activation = 'tanh'))
         q_network.add(Dense(self.action_space, activation = 'linear'))
         q_network.compile(optimizer='rmsprop',
-                          loss='mse')
+                          loss=self._huber_loss)
         return q_network
     
     def update_target(self):
@@ -97,9 +97,13 @@ class DDQN_agent:
         
         return action
     
-    def replay(self, batch_size = 16, epochs = 1):
+    def replay(self, batch_size = 32, epochs = 1):
         
         batch = random.sample(self.memory, batch_size)
+        
+        batch_states = np.empty((0,self.state_space))
+        
+        batch_qs = np.empty((0, self.action_space))
         
         for state, action, reward, next_state, done, in batch:
             
@@ -114,7 +118,11 @@ class DDQN_agent:
             
             target_f[0][action] = target
             
-            self.q_network.fit(state, target_f, epochs = epochs, verbose = 0)
+            batch_states = np.append(batch_states, state, axis = 0)
+            
+            batch_qs = np.append(batch_qs, target_f, axis = 0)
+            
+        self.q_network.fit(batch_states, batch_qs, epochs = epochs, verbose = 0)
                 
         if self.epsilon > self.epsilon_min:
             
@@ -145,9 +153,9 @@ def puckworld_ddqn(process_state, display = False, max_iterations = 1000):
  
     action_space = len(p.getActionSet())
     
-    agent = DDQN_agent(state_space, action_space, memory_max = 20000,
-                 discount = 0.95, epsilon = 0.40, epsilon_min = 0.01,
-                 learning_rate = 0.005,  epsilon_decay = 0.995)
+    agent = DDQN_agent(state_space, action_space, memory_max = 10000,
+                 discount = 0.95, epsilon = 0.60, epsilon_min = 0.01,
+                 learning_rate = 0.005,  epsilon_decay = 0.999)
     
     # setup collection items
     
@@ -155,8 +163,6 @@ def puckworld_ddqn(process_state, display = False, max_iterations = 1000):
     iteration_results = []
     exploration_rates = []
     iterations = []
-    
-    history = deque(np.repeat(-np.inf, max_iterations), maxlen = max_iterations)
     
     # create new game environment
     
@@ -172,7 +178,7 @@ def puckworld_ddqn(process_state, display = False, max_iterations = 1000):
         
         iteration_rewards = []
         
-        while step <= 500:
+        while step < 500:
             
             
             # getting action: getting Q-value from agent, translate into action
@@ -192,7 +198,7 @@ def puckworld_ddqn(process_state, display = False, max_iterations = 1000):
             
             # terminating current run at 500 steps
             
-            done = step == 500
+            done = step == 499
             
             # reshaping new state for memory, adding s, a, r, s', terminal to memory
             
@@ -210,7 +216,7 @@ def puckworld_ddqn(process_state, display = False, max_iterations = 1000):
             
             #current rule for run: 500 steps (green puck location updates)
             
-            if step == 500:
+            if step == 499:
                 
                 print ("Run: " + str(iteration) + ", exploration: " + str(round(agent.epsilon, 3)) + ", score: " + str(round(np.mean(iteration_rewards), 3)))
                 
@@ -222,17 +228,15 @@ def puckworld_ddqn(process_state, display = False, max_iterations = 1000):
                 
                 iterations.append(iteration)
                 
-                history.append(np.mean(iteration_rewards))
-                
                 iteration_rewards = []
                 
             # Update network each step when memory length > batch size
             
-            if (len(agent.memory) > 10000) & (step % 500 == 0):
+            if (len(agent.memory) > 5000) & (step % 200 == 0):
                 
                 agent.replay()
                 
-                if iteration % 20 == 0:
+                if iteration % 50 == 0:
                     
                     agent.update_target()
 
@@ -258,4 +262,4 @@ def puckworld_ddqn(process_state, display = False, max_iterations = 1000):
         iteration += 1
         
         
-        
+      
