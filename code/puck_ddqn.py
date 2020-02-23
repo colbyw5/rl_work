@@ -15,6 +15,7 @@ import pandas as pd
 # model
 from keras.models import Sequential
 from keras.layers import Dense
+from keras.layers import Dropout
 from keras.optimizers import Adam
 from keras import backend as K
 import tensorflow as tf
@@ -22,6 +23,10 @@ import tensorflow as tf
 # importing PuckWorld environment
 from ple.games.puckworld import PuckWorld
 from ple import PLE 
+
+import os
+os.putenv('SDL_VIDEODRIVER', 'fbcon')
+os.environ["SDL_VIDEODRIVER"] = "dummy"
 
 ''' Double Deep Q-learning for PuckWorld '''
 
@@ -62,7 +67,10 @@ class DDQN_agent:
         ''' neural network for Q-value function '''
         
         q_network = Sequential()
-        q_network.add(Dense(50, input_dim = self.state_space,
+        q_network.add(Dense(20, input_dim = self.state_space,
+                            activation = 'tanh'))
+        q_network.add(Dropout(0.5))
+        q_network.add(Dense(20, input_dim = self.state_space,
                             activation = 'tanh'))
         q_network.add(Dense(self.action_space, activation = 'linear'))
         q_network.compile(optimizer='rmsprop',
@@ -140,12 +148,15 @@ class DDQN_agent:
         
         
         
+def puckworld_ddqn(process_state, display=False, max_iterations=1000,
+                   game_size=(20,20), tg_update=20, memory_min=5000,
+                   memory_max=10000, discount=0.95, epsilon_max=0.5,
+                   epsilon_min=0.01, learning_rate=0.001, train_freq=5,
+                   epsilon_decay=0.995):
 
-def puckworld_ddqn(process_state, display = False, max_iterations = 1000):
-    
     # Set up WaterWorld Environment
- 
-    game = PuckWorld(width=20, height=20)
+
+    game = PuckWorld(width=game_size[0], height=game_size[1])
     
     p = PLE(game, display_screen=display, state_preprocessor = process_state)
     
@@ -153,9 +164,10 @@ def puckworld_ddqn(process_state, display = False, max_iterations = 1000):
  
     action_space = len(p.getActionSet())
     
-    agent = DDQN_agent(state_space, action_space, memory_max = 10000,
-                 discount = 0.95, epsilon = 0.60, epsilon_min = 0.01,
-                 learning_rate = 0.005,  epsilon_decay = 0.999)
+    agent = DDQN_agent(state_space, action_space, memory_max = memory_max,
+                 discount = discount, epsilon = epsilon_max,
+                 epsilon_min = epsilon_min,learning_rate = learning_rate,
+                 epsilon_decay = epsilon_decay)
     
     # setup collection items
     
@@ -181,7 +193,7 @@ def puckworld_ddqn(process_state, display = False, max_iterations = 1000):
         while step < 500:
             
             
-            # getting action: getting Q-value from agent, translate into action
+            # getting action: Q-value from agent, translate into action
 
             action = agent.act(state, actions = p.getActionSet())
                 
@@ -200,7 +212,7 @@ def puckworld_ddqn(process_state, display = False, max_iterations = 1000):
             
             done = step == 499
             
-            # reshaping new state for memory, adding s, a, r, s', terminal to memory
+            # adding s, a, r, s', terminal to memory
             
             state_next = np.reshape(state_next, [1, state_space])
             
@@ -218,7 +230,9 @@ def puckworld_ddqn(process_state, display = False, max_iterations = 1000):
             
             if step == 499:
                 
-                print ("Run: " + str(iteration) + ", exploration: " + str(round(agent.epsilon, 3)) + ", score: " + str(round(np.mean(iteration_rewards), 3)))
+                print ("Run: " + str(iteration) + ", exploration: " 
+                       + str(round(agent.epsilon, 3)) + ", score: " 
+                       + str(round(np.mean(iteration_rewards), 3)))
                 
                 # save run, step, reward, exploration, 
                 
@@ -232,13 +246,13 @@ def puckworld_ddqn(process_state, display = False, max_iterations = 1000):
                 
             # Update network each step when memory length > batch size
             
-            if (len(agent.memory) > 5000) & (step % 200 == 0):
+            if (len(agent.memory) > memory_min) & (step % (500/train_freq) == 0):
                 
                 agent.replay()
                 
-                if iteration % 50 == 0:
+            if iteration % tg_update == 0:
                     
-                    agent.update_target()
+                agent.update_target()
 
         
         # max iterations reached: save results to CSV, save model    
