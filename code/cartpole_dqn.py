@@ -15,7 +15,7 @@ import pandas as pd
 # model
 from keras.models import Sequential
 from keras.layers import Dense
-from keras.layers import Dropout
+#from keras.layers import Dropout
 from keras.optimizers import Adam
 
 # importing cartpole environment
@@ -48,13 +48,11 @@ class DQN_agent:
         ''' neural network for Q-value function '''
         
         q_network = Sequential()
-        q_network.add(Dense(20, input_dim = self.state_space,
-                            activation = 'tanh'))
-        q_network.add(Dropout(0.5))
-        q_network.add(Dense(20, input_dim = self.state_space,
-                            activation = 'tanh'))
+        q_network.add(Dense(24, input_dim = self.state_space,
+                            activation = 'relu'))
+        q_network.add(Dense(24, activation = 'relu'))
         q_network.add(Dense(self.action_space, activation = 'linear'))
-        q_network.compile(optimizer=Adam,
+        q_network.compile(optimizer=Adam(lr=self.learning_rate),
                           loss='mse')
         return q_network
     
@@ -81,13 +79,12 @@ class DQN_agent:
         
         return action
     
-    def replay(self, batch_size = 32, epochs = 1):
+    def replay(self, batch_size = 20, epochs = 1):
+        
+        if len(self.memory) < batch_size:
+            return
         
         batch = random.sample(self.memory, batch_size)
-        
-        batch_states = np.empty((0,self.state_space))
-        
-        batch_qs = np.empty((0, self.action_space))
         
         for state, action, reward, next_state, done, in batch:
             
@@ -96,18 +93,15 @@ class DQN_agent:
             if not done:
                 
                 target = (reward + self.gamma * 
-                          np.amax(self.target_network.predict(next_state)[0]))
+                          np.amax(self.q_network.predict(next_state)[0]))
                 
-            target_f = self.target_network.predict(state)
+            target_f = self.q_network.predict(state)
             
             target_f[0][action] = target
             
-            batch_states = np.append(batch_states, state, axis = 0)
-            
-            batch_qs = np.append(batch_qs, target_f, axis = 0)
-            
-        self.q_network.fit(batch_states, batch_qs, epochs = epochs, verbose = 0)
-                
+            self.q_network.fit(state, target_f, epochs = epochs, \
+                               verbose = 0)
+                    
         if self.epsilon > self.epsilon_min:
             
             self.epsilon *= self.epsilon_decay
@@ -125,7 +119,7 @@ class DQN_agent:
         
         
 
-def cartpole_dqn(process_state, display = False, max_iterations = 1000):
+def cartpole_dqn(max_iterations = 1000):
     
     # Set up WaterWorld Environment
  
@@ -146,7 +140,8 @@ def cartpole_dqn(process_state, display = False, max_iterations = 1000):
     exploration_rates = []
     iterations = []
     
-    history = deque(np.repeat(-np.inf, max_iterations), maxlen = max_iterations)
+    history = deque(np.repeat(-np.inf, max_iterations),\
+                    maxlen = max_iterations)
     
     # create new game environment
     
@@ -159,33 +154,29 @@ def cartpole_dqn(process_state, display = False, max_iterations = 1000):
         
         iteration_rewards = []
         
-        while step <= 500:
+        done = False
+        
+        while not done:
             
             step +=1
             
-            # getting action: getting Q-value from agent, translate into action
+            # getting action: Q-value from agent, translate into action
 
-            action = agent.act(state, actions = env.actions)
+            action = agent.act(state, actions = [0,1])
             
-            # agent acts, reward is realized
+            # agent acts, reward is realized, next step assigned
             
-            reward = round(p.act(action), 2)
+            state_next, reward, done, info = env.step(action)
             
-            iteration_rewards.append(reward)
+            reward = reward if not done else -reward
             
-            # getting next state based on action
-            
-            state_next = p.getGameState()
-            
-            # terminating current run at 500 steps
-            
-            done = step == 500
-            
-            # reshaping new state for memory, adding s, a, r, s', terminal to memory
+            # reshaping new state, adding s, a, r, s', done to memory
             
             state_next = np.reshape(state_next, [1, state_space])
             
-            agent_action = p.getActionSet().index(action)
+            iteration_rewards.append(reward)
+            
+            agent_action = action
             
             agent.memorize(state, agent_action, reward, state_next, done)
             
@@ -196,9 +187,11 @@ def cartpole_dqn(process_state, display = False, max_iterations = 1000):
             
             #current rule for run: 500 steps (green puck location updates)
             
-            if step == 500:
+            if done:
                 
-                print ("Run: " + str(iteration) + ", exploration: " + str(agent.epsilon) + ", score: " + str(sum(iteration_rewards)))
+                print ("Iteration: " + str(iteration) + ", exploration: " + \
+                       str(round(agent.epsilon, 3)) + ", score: " + \
+                           str(sum(iteration_rewards)))
                 
                 # save run, step, reward, exploration, 
                 
@@ -213,8 +206,6 @@ def cartpole_dqn(process_state, display = False, max_iterations = 1000):
                 iteration_rewards = []
                 
             # Update network each step when memory length > batch size
-            
-            if (len(agent.memory) > 500) & (step % 50 == 0):
                 
                 agent.replay()
 
@@ -229,7 +220,8 @@ def cartpole_dqn(process_state, display = False, max_iterations = 1000):
             
             pd.DataFrame({'rewards': iteration_results,
                           'exploration': exploration_rates,
-                          'run': iterations}).to_csv('./results.csv', index = False)
+                          'run': iterations}).to_csv('./results.csv',\
+                                                     index = False)
             
             # save model
             
