@@ -67,11 +67,8 @@ class DDQN_agent:
         ''' neural network for Q-value function '''
         
         q_network = Sequential()
-        q_network.add(Dense(20, input_dim = self.state_space,
-                            activation = 'tanh'))
-        q_network.add(Dropout(0.5))
-        q_network.add(Dense(20, input_dim = self.state_space,
-                            activation = 'tanh'))
+        q_network.add(Dense(32, input_dim = self.state_space,
+                            activation = 'relu'))
         q_network.add(Dense(self.action_space, activation = 'linear'))
         q_network.compile(optimizer='rmsprop',
                           loss=self._huber_loss)
@@ -151,8 +148,8 @@ class DDQN_agent:
 def puckworld_ddqn(process_state, display=False, max_iterations=1000,
                    game_size=(20,20), tg_update=20, memory_min=5000,
                    memory_max=10000, discount=0.95, epsilon_max=0.5,
-                   epsilon_min=0.01, learning_rate=0.001, train_freq=5,
-                   epsilon_decay=0.995):
+                   epsilon_min=0.01, learning_rate=0.001,
+                   epsilon_decay=0.9995):
 
     # Set up WaterWorld Environment
 
@@ -246,7 +243,7 @@ def puckworld_ddqn(process_state, display=False, max_iterations=1000,
                 
             # Update network each step when memory length > batch size
             
-            if (len(agent.memory) > memory_min) & (step % (500/train_freq) == 0):
+            if (len(agent.memory) > memory_min):
                 
                 agent.replay()
                 

@@ -51,6 +51,7 @@ class DQN_agent:
         q_network.add(Dense(24, input_dim = self.state_space,
                             activation = 'relu'))
         q_network.add(Dense(24, activation = 'relu'))
+        q_network.add(Dense(24, activation = 'relu'))
         q_network.add(Dense(self.action_space, activation = 'linear'))
         q_network.compile(optimizer=Adam(lr=self.learning_rate),
                           loss='mse')
@@ -81,7 +82,7 @@ class DQN_agent:
     
     def replay(self, batch_size = 20, epochs = 1):
         
-        if len(self.memory) < batch_size:
+        if len(self.memory) < 5*batch_size:
             return
         
         batch = random.sample(self.memory, batch_size)
@@ -102,9 +103,10 @@ class DQN_agent:
             self.q_network.fit(state, target_f, epochs = epochs, \
                                verbose = 0)
                     
-        if self.epsilon > self.epsilon_min:
-            
-            self.epsilon *= self.epsilon_decay
+                
+            if self.epsilon > self.epsilon_min:
+                
+                self.epsilon *= self.epsilon_decay
     
                     
     def load_agent(self, path):
@@ -148,6 +150,8 @@ def cartpole_dqn(max_iterations = 1000):
 
     while iteration <= max_iterations:
         
+        state = env.reset()
+        
         state = np.reshape(env.reset(), [1, state_space])
         
         step = 0
@@ -159,6 +163,8 @@ def cartpole_dqn(max_iterations = 1000):
         while not done:
             
             step +=1
+            
+            env.render()
             
             # getting action: Q-value from agent, translate into action
 
@@ -207,7 +213,7 @@ def cartpole_dqn(max_iterations = 1000):
                 
             # Update network each step when memory length > batch size
                 
-                agent.replay()
+            agent.replay()
 
         
         # max iterations reached: save results to CSV, save model    
